@@ -8,14 +8,14 @@ import {
   PluginSettingTab,
   setIcon,
   Setting,
+  SettingGroup,
   TFile,
   TFolder,
   moment,
-} from "obsidian";
+} from 'obsidian';
 
 interface ArchiveFileSettings {
   showInFileMenu: boolean;
-  showInRibbon: boolean;
   showInSearch: boolean;
   showNotification: boolean;
   archiveFolder: string;
@@ -26,19 +26,18 @@ interface ArchiveFileSettings {
 
 const DEFAULT_SETTINGS: ArchiveFileSettings = {
   showInFileMenu: true,
-  showInRibbon: true,
   showInSearch: true,
   showNotification: true,
-  archiveFolder: "",
+  archiveFolder: '',
   useTimestamps: true,
-  tagsToStrip: "",
+  tagsToStrip: '',
   removeEmptyTags: true,
 };
 
 interface WorkspaceWithSearch {
   on(
-    name: "search:results-menu",
-    callback: (menu: Menu, leaf: SearchLeaf) => void,
+    name: 'search:results-menu',
+    callback: (menu: Menu, leaf: SearchLeaf) => void
   ): EventRef;
 }
 
@@ -63,57 +62,51 @@ export default class ArchiveFilePlugin extends Plugin {
 
     // Command palette
     this.addCommand({
-      id: "archive-file",
-      name: "Archive file",
-      icon: "lucide-archive-restore",
+      id: 'archive-file',
+      name: 'Archive file',
+      icon: 'archive-restore',
       callback: () => this.archiveActiveFile(),
     });
 
-    // File context menu
+    // File context menus
     if (this.settings.showInFileMenu) {
       this.registerEvent(
-        this.app.workspace.on("file-menu", (menu, file) => {
+        this.app.workspace.on('file-menu', (menu, file) => {
           if (!(file instanceof TFile)) return;
           menu.addItem((item) => {
             item
-              .setTitle("Archive file")
-              .setIcon("lucide-archive-restore")
-              .setSection("action")
+              .setTitle('Archive file')
+              .setIcon('archive-restore')
+              .setSection('action')
               .onClick(() => this.archiveFiles([file]));
           });
-        }),
+        })
       );
-    }
-
-    // Multi-file context menu
-    if (this.settings.showInFileMenu) {
       this.registerEvent(
-        this.app.workspace.on("files-menu", (menu, files) => {
+        this.app.workspace.on('files-menu', (menu, files) => {
           const tfiles = files.filter((f): f is TFile => f instanceof TFile);
           if (tfiles.length === 0) return;
           menu.addItem((item) => {
             item
               .setTitle(this.getMenuTitle(tfiles.length))
-              .setIcon("lucide-archive-restore")
-              .setSection("action")
+              .setIcon('archive-restore')
+              .setSection('action')
               .onClick(() => this.archiveFiles(tfiles));
           });
-        }),
+        })
       );
     }
 
     // Ribbon icon
-    if (this.settings.showInRibbon) {
-      this.addRibbonIcon("lucide-archive-restore", "Archive file", () =>
-        this.archiveActiveFile(),
-      );
-    }
+    this.addRibbonIcon('archive-restore', 'Archive file', () =>
+      this.archiveActiveFile()
+    );
 
     // Vault search results menu
     if (this.settings.showInSearch) {
       this.registerEvent(
         (this.app.workspace as unknown as WorkspaceWithSearch).on(
-          "search:results-menu",
+          'search:results-menu',
           (menu, leaf) => {
             const files: TFile[] = [];
             if (leaf.dom?.vChildren?.children) {
@@ -127,12 +120,12 @@ export default class ArchiveFilePlugin extends Plugin {
             menu.addItem((item) => {
               item
                 .setTitle(this.getMenuTitle(files.length))
-                .setIcon("lucide-archive-restore")
-                .setSection("action")
+                .setIcon('archive-restore')
+                .setSection('action')
                 .onClick(() => this.archiveFiles(files));
             });
-          },
-        ),
+          }
+        )
       );
     }
 
@@ -144,19 +137,19 @@ export default class ArchiveFilePlugin extends Plugin {
     if (file) {
       void this.archiveFiles([file]);
     } else {
-      new Notice("No active file");
+      new Notice('No active file');
     }
   }
 
   private getMenuTitle(count: number): string {
-    return count === 1 ? "Archive file" : `Archive ${count} files`;
+    return count === 1 ? 'Archive file' : `Archive ${count} files`;
   }
 
   private async archiveFiles(files: TFile[]): Promise<void> {
     if (files.length === 0) return;
 
     if (!this.settings.archiveFolder) {
-      new Notice("No archive folder set");
+      new Notice('No archive folder set');
       return;
     }
 
@@ -164,15 +157,15 @@ export default class ArchiveFilePlugin extends Plugin {
     const now = moment();
     let archiveFolder = this.settings.useTimestamps
       ? this.settings.archiveFolder.replace(/\{([^}]+)\}/g, (_, fmt: string) =>
-          now.format(fmt),
+          now.format(fmt)
         )
       : this.settings.archiveFolder;
-    archiveFolder = archiveFolder.replace(/^\/+|\/+$/g, "");
+    archiveFolder = archiveFolder.replace(/^\/+|\/+$/g, '');
 
     const tagsToStrip = this.settings.tagsToStrip
       ? this.settings.tagsToStrip
-          .split(",")
-          .map((t) => t.trim().replace(/^#/, "").toLowerCase())
+          .split(',')
+          .map((t) => t.trim().replace(/^#/, '').toLowerCase())
           .filter(Boolean)
       : [];
 
@@ -180,16 +173,16 @@ export default class ArchiveFilePlugin extends Plugin {
     let failedCount = 0;
     for (const file of files) {
       const result = await this.archiveFile(file, archiveFolder, tagsToStrip);
-      if (result === "moved") movedCount++;
-      else if (result === "failed") failedCount++;
+      if (result === 'moved') movedCount++;
+      else if (result === 'failed') failedCount++;
     }
 
     if (this.settings.showNotification) {
       if (files.length === 1 && failedCount === 0) {
-        new Notice("File archived");
+        new Notice('File archived');
       } else if (movedCount > 0) {
         new Notice(
-          movedCount === 1 ? "1 file archived" : `${movedCount} files archived`,
+          movedCount === 1 ? '1 file archived' : `${movedCount} files archived`
         );
       }
     }
@@ -198,9 +191,9 @@ export default class ArchiveFilePlugin extends Plugin {
   private async archiveFile(
     file: TFile,
     archiveFolder: string,
-    tagsToStrip: string[],
-  ): Promise<"moved" | "skipped" | "failed"> {
-    const currentFolder = file.parent?.path ?? "";
+    tagsToStrip: string[]
+  ): Promise<'moved' | 'skipped' | 'failed'> {
+    const currentFolder = file.parent?.path ?? '';
     const needsMove = currentFolder !== archiveFolder;
 
     try {
@@ -229,7 +222,7 @@ export default class ArchiveFilePlugin extends Plugin {
       }
 
       // Strip tags regardless of move
-      if (tagsToStrip.length > 0 && file.extension === "md") {
+      if (tagsToStrip.length > 0 && file.extension === 'md') {
         try {
           await this.app.fileManager.processFrontMatter(
             file,
@@ -240,7 +233,8 @@ export default class ArchiveFilePlugin extends Plugin {
                   : [frontmatter.tags];
                 const filtered = currentTags.filter(
                   (tag) =>
-                    !tagsToStrip.includes(tag.replace(/^#/, "").toLowerCase()),
+                    typeof tag !== 'string' ||
+                    !tagsToStrip.includes(tag.replace(/^#/, '').toLowerCase())
                 );
                 if (filtered.length === 0) {
                   if (this.settings.removeEmptyTags) {
@@ -252,17 +246,17 @@ export default class ArchiveFilePlugin extends Plugin {
                   frontmatter.tags = filtered;
                 }
               }
-            },
+            }
           );
         } catch (tagError) {
-          console.error("Failed to strip tags:", tagError);
+          console.error('Failed to strip tags:', tagError);
         }
       }
 
-      return needsMove ? "moved" : "skipped";
+      return needsMove ? 'moved' : 'skipped';
     } catch (error) {
-      console.error("Failed to archive:", error);
-      return "failed";
+      console.error('Failed to archive:', error);
+      return 'failed';
     }
   }
 
@@ -270,7 +264,7 @@ export default class ArchiveFilePlugin extends Plugin {
     this.settings = Object.assign(
       {},
       DEFAULT_SETTINGS,
-      (await this.loadData()) as Partial<ArchiveFileSettings>,
+      (await this.loadData()) as Partial<ArchiveFileSettings>
     );
   }
 
@@ -285,159 +279,161 @@ class ArchiveFileSettingTab extends PluginSettingTab {
   constructor(app: App, plugin: ArchiveFilePlugin) {
     super(app, plugin);
     this.plugin = plugin;
+    this.icon = 'archive-restore';
   }
 
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.addClass("archive-file-settings");
+    containerEl.addClass('archive-file-settings');
 
-    new Setting(containerEl)
-      .setName("Archive folder")
-      .setDesc("Destination folder for archived files")
-      .addText((text) => {
-        text
-          .setPlaceholder("Archive")
-          .setValue(this.plugin.settings.archiveFolder)
-          .onChange(async (value) => {
-            this.plugin.settings.archiveFolder = value;
-            await this.plugin.saveSettings();
-          });
-        new FolderSuggest(this.app, text.inputEl);
-      });
-
-    const archiveFolderSubSettings = containerEl.createDiv(
-      "archive-file-sub-settings",
-    );
-    const timestampSetting = new Setting(archiveFolderSubSettings)
-      .setName("Resolve timestamps in folder path")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.useTimestamps)
-          .onChange(async (value) => {
-            this.plugin.settings.useTimestamps = value;
-            await this.plugin.saveSettings();
-          }),
-      );
-    const desc = timestampSetting.descEl;
-    const now = moment();
-    desc.appendText("Convert date tokens in {braces} using ");
-    desc.createEl("a", {
-      text: "Moment.js",
-      href: "https://momentjs.com/docs/#/displaying/format/",
-    });
-    desc.appendText(
-      ` format. E.g., {YYYY} → ${now.format("YYYY")}, {MM} → ${now.format("MM")}.`,
-    );
-
-    const tagsStripSetting = new Setting(containerEl)
-      .setName("Tags to strip")
-      .setDesc(
-        "Comma-separated list of tags to remove from properties when archiving",
-      );
-
-    const tagsSubSettings = containerEl.createDiv("archive-file-sub-settings");
+    // Pre-create wrapper div for tags sub-setting (needed for onChange callback)
+    const tagsSubSettings = containerEl.createDiv('setting-sub-items');
     if (!this.plugin.settings.tagsToStrip) {
-      tagsSubSettings.addClass("archive-file-hidden");
+      tagsSubSettings.addClass('archive-file-hidden');
     }
 
-    tagsStripSetting.addText((text) =>
-      text
-        .setPlaceholder("Inbox, todo")
-        .setValue(this.plugin.settings.tagsToStrip)
-        .onChange(async (value) => {
-          this.plugin.settings.tagsToStrip = value;
-          await this.plugin.saveSettings();
-          tagsSubSettings.toggleClass("archive-file-hidden", !value);
-        }),
-    );
+    // Capture settings for post-processing
+    let timestampSetting: Setting | undefined;
+    let tagsSubSetting: Setting | undefined;
 
-    new Setting(tagsSubSettings)
-      .setName("Remove empty tags property")
-      .setDesc(
-        "Delete the tags property from properties if all tags are stripped",
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.removeEmptyTags)
-          .onChange(async (value) => {
-            this.plugin.settings.removeEmptyTags = value;
-            await this.plugin.saveSettings();
-          }),
-      );
+    new SettingGroup(containerEl)
+      .addSetting((s) => {
+        s.setName('Archive folder')
+          .setDesc('Destination folder for archived files')
+          .addText((text) => {
+            text
+              .setPlaceholder('Archive')
+              .setValue(this.plugin.settings.archiveFolder)
+              .onChange(async (value) => {
+                this.plugin.settings.archiveFolder = value;
+                await this.plugin.saveSettings();
+              });
+            new FolderSuggest(this.app, text.inputEl);
+          });
+      })
+      .addSetting((s) => {
+        timestampSetting = s;
+        s.setName('Resolve timestamps in folder path').addToggle((toggle) =>
+          toggle
+            .setValue(this.plugin.settings.useTimestamps)
+            .onChange(async (value) => {
+              this.plugin.settings.useTimestamps = value;
+              await this.plugin.saveSettings();
+            })
+        );
+      })
+      .addSetting((s) => {
+        s.setName('Tags to strip')
+          .setDesc(
+            'Comma-separated list of tags to remove from properties when archiving'
+          )
+          .addText((text) =>
+            text
+              .setPlaceholder('Inbox, todo')
+              .setValue(this.plugin.settings.tagsToStrip)
+              .onChange(async (value) => {
+                this.plugin.settings.tagsToStrip = value;
+                await this.plugin.saveSettings();
+                tagsSubSettings.toggleClass('archive-file-hidden', !value);
+              })
+          );
+      })
+      .addSetting((s) => {
+        tagsSubSetting = s;
+        s.setName('Remove empty tags property')
+          .setDesc(
+            'Delete the tags property from properties if all tags are stripped'
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.removeEmptyTags)
+              .onChange(async (value) => {
+                this.plugin.settings.removeEmptyTags = value;
+                await this.plugin.saveSettings();
+              })
+          );
+      })
+      .addSetting((s) => {
+        s.setName('File context menu')
+          .setDesc(
+            'Show archive option when right-clicking files (reload required)'
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.showInFileMenu)
+              .onChange(async (value) => {
+                this.plugin.settings.showInFileMenu = value;
+                await this.plugin.saveSettings();
+              })
+          );
+      })
+      .addSetting((s) => {
+        s.setName('Vault search menu')
+          .setDesc(
+            'Show archive option in vault search results context menu (reload required)'
+          )
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.showInSearch)
+              .onChange(async (value) => {
+                this.plugin.settings.showInSearch = value;
+                await this.plugin.saveSettings();
+              })
+          );
+      })
+      .addSetting((s) => {
+        s.setName('Show notification')
+          .setDesc('Show a notice after archiving files')
+          .addToggle((toggle) =>
+            toggle
+              .setValue(this.plugin.settings.showNotification)
+              .onChange(async (value) => {
+                this.plugin.settings.showNotification = value;
+                await this.plugin.saveSettings();
+              })
+          );
+      });
 
-    new Setting(containerEl)
-      .setName("File context menu")
-      .setDesc(
-        "Show archive option when right-clicking files (reload required)",
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showInFileMenu)
-          .onChange(async (value) => {
-            this.plugin.settings.showInFileMenu = value;
-            await this.plugin.saveSettings();
-          }),
+    // Add description to timestamp setting (after SettingGroup executes callbacks)
+    if (timestampSetting) {
+      const now = moment();
+      const desc = timestampSetting.descEl;
+      desc.appendText('Convert date tokens in {braces} using ');
+      desc.createEl('a', {
+        text: 'Moment.js',
+        href: 'https://momentjs.com/docs/#/displaying/format/',
+      });
+      desc.appendText(
+        ` format. E.g., {YYYY} → ${now.format('YYYY')}, {MM} → ${now.format('MM')}.`
       );
+    }
 
-    new Setting(containerEl)
-      .setName("Ribbon icon")
-      .setDesc("Show archive icon in the ribbon (reload required)")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showInRibbon)
-          .onChange(async (value) => {
-            this.plugin.settings.showInRibbon = value;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName("Vault search menu")
-      .setDesc(
-        "Show archive option in vault search results context menu (reload required)",
-      )
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showInSearch)
-          .onChange(async (value) => {
-            this.plugin.settings.showInSearch = value;
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    const lastSetting = new Setting(containerEl)
-      .setName("Show notification")
-      .setDesc("Show a notice after archiving files")
-      .addToggle((toggle) =>
-        toggle
-          .setValue(this.plugin.settings.showNotification)
-          .onChange(async (value) => {
-            this.plugin.settings.showNotification = value;
-            await this.plugin.saveSettings();
-          }),
-      );
-    lastSetting.settingEl.addClass("archive-file-settings-last");
+    // Move tags sub-setting into wrapper
+    if (tagsSubSetting) {
+      tagsSubSetting.settingEl.before(tagsSubSettings);
+      tagsSubSettings.appendChild(tagsSubSetting.settingEl);
+    }
 
     // Feedback button
-    const feedbackContainer = containerEl.createEl("div", {
-      cls: "archive-file-feedback-container",
+    const feedbackContainer = containerEl.createEl('div', {
+      cls: 'archive-file-feedback-container',
     });
 
-    const button = feedbackContainer.createEl("button", {
-      cls: "mod-cta archive-file-feedback-button",
+    const button = feedbackContainer.createEl('button', {
+      cls: 'mod-cta archive-file-feedback-button',
     });
-    button.addEventListener("click", () => {
+    button.addEventListener('click', () => {
       globalThis.open(
-        "https://github.com/greetclammy/archive-file/issues",
-        "_blank",
+        'https://github.com/greetclammy/archive-file/issues',
+        '_blank'
       );
     });
 
-    const iconDiv = button.createEl("div");
-    setIcon(iconDiv, "message-square-reply");
+    const iconDiv = button.createEl('div');
+    setIcon(iconDiv, 'message-square-reply');
 
-    button.appendText("Leave feedback");
+    button.appendText('Leave feedback');
   }
 }
 
@@ -452,7 +448,9 @@ class FolderSuggest extends AbstractInputSuggest<TFolder> {
   getSuggestions(query: string): TFolder[] {
     const folders = this.app.vault
       .getAllLoadedFiles()
-      .filter((file): file is TFolder => file instanceof TFolder);
+      .filter(
+        (file): file is TFolder => file instanceof TFolder && file.path !== ''
+      );
 
     if (!query) {
       return folders.slice(0, 10);
@@ -465,12 +463,12 @@ class FolderSuggest extends AbstractInputSuggest<TFolder> {
   }
 
   renderSuggestion(folder: TFolder, el: HTMLElement): void {
-    el.setText(folder.path || "/");
+    el.setText(folder.path);
   }
 
   selectSuggestion(folder: TFolder): void {
-    this.inputEl.value = folder.path || "/";
-    this.inputEl.trigger("input");
+    this.inputEl.value = folder.path;
+    this.inputEl.trigger('input');
     this.close();
   }
 }

@@ -1,25 +1,37 @@
-.archive-file-settings .archive-file-settings-last {
-  border-bottom: none;
-}
-
 .archive-file-settings .archive-file-hidden {
   display: none;
 }
 
-.archive-file-settings .archive-file-sub-settings {
+/* Indented sub-settings */
+.setting-sub-items {
   margin-inline-start: 20px;
   padding-left: 1em;
   position: relative;
 }
 
-.archive-file-settings .archive-file-sub-settings::before {
-  content: "";
+.setting-sub-items::before {
+  content: '';
   position: absolute;
   left: 0;
   top: 0;
-  bottom: 10px;
+  bottom: 0;
   width: 1px;
   background-color: var(--background-modifier-border);
+}
+
+/* Add padding only when visible and not last */
+.setting-sub-items:not(.archive-file-hidden):has(+ .setting-item) {
+  padding-bottom: var(--size-4-4, 16px);
+}
+
+.setting-sub-items:not(.archive-file-hidden):has(+ .setting-item)::before {
+  bottom: var(--size-4-4, 16px);
+}
+
+/* Remove bottom padding from setting when sub-items hidden and last in group */
+.setting-items
+  > .setting-item:has(+ .setting-sub-items.archive-file-hidden:last-child) {
+  padding-bottom: 0;
 }
 
 .archive-file-settings .archive-file-feedback-container {
