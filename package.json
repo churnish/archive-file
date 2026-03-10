@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Move the current file to an archive folder.",
   "main": "main.js",
+  "license": "GPL-3.0-or-later",
+  "author": "churnish",
+  "type": "module",
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
@@ -15,10 +18,11 @@
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
     "@types/node": "^24.10.1",
-    "@typescript-eslint/parser": "^8.52.0",
+    "builtin-modules": "^3.3.0",
     "esbuild": "^0.27.3",
-    "eslint": "^9.39.2",
+    "eslint": "^9.39.3",
     "eslint-plugin-obsidianmd": "^0.1.9",
+    "globals": "^17.4.0",
     "knip": "^5.85.0",
     "obsidian": "^1.11.4",
     "prettier": "^3.8.1",
