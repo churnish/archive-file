@@ -13,6 +13,7 @@
     "postversion": "git push origin main --follow-tags --force-with-lease"
   },
   "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
     "@types/node": "^24.10.1",
     "@typescript-eslint/parser": "^8.52.0",
     "esbuild": "^0.27.3",
@@ -31,8 +32,13 @@
     "project": [
       "**/*.ts"
     ],
-    "ignoreDependencies": ["prettier"],
-    "ignoreBinaries": ["tsc", "knip"],
+    "ignoreDependencies": [
+      "prettier"
+    ],
+    "ignoreBinaries": [
+      "tsc",
+      "knip"
+    ],
     "ignoreExportsUsedInFile": true
   }
 }
