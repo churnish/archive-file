@@ -6,7 +6,7 @@ Add command to move file to a specified archive folder.
 
 ## Installation
 
-Until _Archive File_ is [made available](https://github.com/obsidianmd/obsidian-releases/pull/8835) in the plugin directory, to install it:
+Until _Archive File_ is [approved](https://github.com/obsidianmd/obsidian-releases/pull/8835), to install it:
 
 1. Download and enable the [BRAT](https://churnish.github.io/http-protocol-redirector?r=obsidian://show-plugin?id=obsidian42-brat) plugin.
 2. [Install via BRAT](https://churnish.github.io/http-protocol-redirector?r=obsidian://brat?plugin=churnish/archive-file).
