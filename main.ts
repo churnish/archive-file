@@ -62,8 +62,8 @@ export default class ArchiveFilePlugin extends Plugin {
 
     // Command palette
     this.addCommand({
-      id: 'archive-file',
-      name: 'Archive file',
+      id: 'archive-active-file',
+      name: 'Archive current file',
       icon: 'archive-restore',
       callback: () => this.archiveActiveFile(),
     });
@@ -416,7 +416,7 @@ class ArchiveFileSettingTab extends PluginSettingTab {
     }
 
     // Feedback button
-    const feedbackContainer = containerEl.createEl('div', {
+    const feedbackContainer = containerEl.createDiv({
       cls: 'archive-file-feedback-container',
     });
 
@@ -424,13 +424,13 @@ class ArchiveFileSettingTab extends PluginSettingTab {
       cls: 'mod-cta archive-file-feedback-button',
     });
     button.addEventListener('click', () => {
-      globalThis.open(
+      window.open(
         'https://github.com/greetclammy/archive-file/issues',
         '_blank'
       );
     });
 
-    const iconDiv = button.createEl('div');
+    const iconDiv = button.createDiv();
     setIcon(iconDiv, 'message-square-reply');
 
     button.appendText('Leave feedback');
