@@ -10,10 +10,12 @@
     "dev": "node esbuild.config.mjs",
     "build": "node esbuild.config.mjs production",
     "css": "true",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "knip": "knip",
     "preversion": "node version-bump.mjs --preflight",
     "version": "node version-bump.mjs",
-    "postversion": "git push origin main --follow-tags --force-with-lease"
+    "postversion": "git push origin main --follow-tags"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
@@ -39,8 +41,9 @@
       "prettier"
     ],
     "ignoreBinaries": [
-      "tsc",
-      "knip"
+      "eslint",
+      "knip",
+      "tsc"
     ],
     "ignoreExportsUsedInFile": true
   }

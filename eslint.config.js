@@ -5,7 +5,7 @@ import comments from '@eslint-community/eslint-plugin-eslint-comments/configs';
 
 export default defineConfig([
   {
-    ignores: ['**', '!src/**', '!main.ts'],
+    ignores: ['**', '!src/**', '!main.ts', '!tests/**', '!package.json'],
   },
 
   ...obsidianmd.configs.recommended,
