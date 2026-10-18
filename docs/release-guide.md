@@ -100,10 +100,10 @@ Delete the local tag, undo the version bump commit, and restore the files it cha
 ```bash
 git tag -d 0.9.0
 git reset --soft HEAD~1
-git restore --staged --worktree package.json manifest.json README.md
+git restore --staged --worktree -- $(git diff --cached --name-only)
 ```
 
-`--soft` leaves the version bump changes staged. The `restore` command reverts them so `npm version` can run cleanly on the original state.
+`--soft` leaves the version bump commit's changes staged, and nothing else, since `npm version` refuses to run on a dirty working tree. The `restore` command reverts exactly those files, whichever the bump touched (`package.json`, `manifest.json`, `README.md`, `docs/release-guide.md`, and `versions.json` when it changed), and removes a `versions.json` the bump created. Uncommitted edits to other files survive. Name no files by hand: a listed file a plugin does not track makes `git restore` fail and restore nothing.
 
 If already pushed, also revert the remote changes:
 
