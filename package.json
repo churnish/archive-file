@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "^4.7.1",
+    "@eslint/css": "^2.0.1",
     "@types/node": "^24.10.1",
     "esbuild": "^0.27.3",
     "eslint": "^9.39.3",
