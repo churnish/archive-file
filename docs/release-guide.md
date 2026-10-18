@@ -2,7 +2,7 @@
 title: Release guide
 description: "End-to-end release workflow: npm version commands, preversion/version/postversion lifecycle, GitHub Action build, wiki publishing, and rollback procedures."
 author: 🤖 Generated with Claude Code
-updated: 2026-03-11
+updated: 2026-10-18
 ---
 # Release guide
 
@@ -49,7 +49,7 @@ npm updates the `version` field in `package.json` (only runs if preversion succe
 ### Step 3: `version` script runs
 
 ```json
-"version": "node version-bump.mjs && git add manifest.json"
+"version": "node version-bump.mjs"
 ```
 
 `version-bump.mjs` (without `--preflight`) re-validates, then:
@@ -65,7 +65,7 @@ npm creates a commit and a matching git tag (e.g. `0.8.1`). No `v` prefix — `.
 ### Step 5: `postversion` script pushes
 
 ```json
-"postversion": "git push origin main --follow-tags --force-with-lease"
+"postversion": "git push origin main --follow-tags"
 ```
 
 Pushes the commit and tag to GitHub in one go.
@@ -74,11 +74,13 @@ Pushes the commit and tag to GitHub in one go.
 
 The tag push triggers `.github/workflows/release.yml`:
 
-1. **Checkout** → **install** (`npm ci`) → **build** (`npm run build`).
-2. **Commits build output** (`main.js`, `manifest.json`) back to `main`.
-3. **Bundles** `main.js`, `manifest.json`, `styles.css` into a zip.
-4. **Generates release notes** from merged PRs and closed issues since the previous tag.
-5. **Creates a GitHub Release** with the bundle and individual files attached.
+1. **Checkout** (full history) → **install** (`npm install`: `npm ci` requires a lockfile, and lockfiles are gitignored).
+2. **Gates**, in TS plugins only: **compile CSS** (`npm run css`, so the lint reads the compiled `styles.css`) → **lint** (`npm run lint`) → **typecheck** (`npx tsc --noEmit`) → **test** (`npm test`, in plugins that have tests). A failure stops the release before anything is built. Plugins with a Tests workflow (`test.yml`) run the same checks there, but only on pull requests, so a tag push never triggers it.
+3. **Build** (`npm run build`).
+4. **Commits anything the build changed** back to `main`, rebased onto the latest `origin/main`. Usually there is nothing to commit: build outputs are gitignored.
+5. **Generates release notes** from merged PRs and closed issues since the previous tag.
+6. **Attests build provenance** for `main.js`, `manifest.json` and, when the plugin has one, `styles.css`.
+7. **Creates a GitHub Release** with `main.js`, `manifest.json` and `styles.css` attached.
 
 ## Updating wiki pages
 
@@ -98,7 +100,7 @@ Delete the local tag, undo the version bump commit, and restore the files it cha
 ```bash
 git tag -d 0.9.0
 git reset --soft HEAD~1
-git restore --staged --worktree package.json manifest.json README.md package-lock.json
+git restore --staged --worktree package.json manifest.json README.md
 ```
 
 `--soft` leaves the version bump changes staged. The `restore` command reverts them so `npm version` can run cleanly on the original state.
