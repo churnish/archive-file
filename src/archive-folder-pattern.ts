@@ -1,12 +1,30 @@
 import { moment } from 'obsidian';
 
+/** The part of a Moment date this plugin uses. */
+export interface MomentDate {
+  format(format: string): string;
+  isValid(): boolean;
+}
+
+// Obsidian types its `moment` export through the separate `moment` package, which the community directory's review cannot resolve, so every direct call reaches its lint as an error type. Narrowing once here keeps each call typed there too, as Dynamic Views' `formatWithMoment` does.
+const createMoment = moment as unknown as (
+  input?: string,
+  format?: string,
+  strict?: boolean
+) => MomentDate;
+
+/** The current date and time. */
+export function currentMoment(): MomentDate {
+  return createMoment();
+}
+
 // Splitting on this keeps the captured formats, so even indices are literal text and odd indices are Moment formats
 const DATE_TOKEN = /\{([^}]+)\}/;
 
 /** Replaces every `{format}` token in the archive folder template with `date` in that Moment format. */
 export function resolveArchiveFolder(
   template: string,
-  date: ReturnType<typeof moment>
+  date: MomentDate
 ): string {
   return template
     .split(DATE_TOKEN)
@@ -34,7 +52,7 @@ export function buildArchiveFolderMatcher(
     return (
       match !== null &&
       formats.every((format, index) =>
-        moment(match[index + 1], format, true).isValid()
+        createMoment(match[index + 1], format, true).isValid()
       )
     );
   };

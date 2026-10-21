@@ -9,10 +9,10 @@ import {
   Setting,
   SettingDefinitionItem,
   TFile,
-  moment,
 } from 'obsidian';
 import {
   buildArchiveFolderMatcher,
+  currentMoment,
   resolveArchiveFolder,
 } from './src/archive-folder-pattern';
 import { NotebookNavigatorIntegration } from './src/notebook-navigator-integration';
@@ -162,7 +162,7 @@ export default class ArchiveFilePlugin extends Plugin {
     const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '');
     const folderTemplate = trimSlashes(this.settings.archiveFolder);
     const archiveFolder = this.settings.useTimestamps
-      ? trimSlashes(resolveArchiveFolder(folderTemplate, moment()))
+      ? trimSlashes(resolveArchiveFolder(folderTemplate, currentMoment()))
       : folderTemplate;
     // With timestamps, a folder the template resolved to on an earlier date is already the file's archive, so it stays there
     const isArchiveFolder = this.settings.useTimestamps
@@ -287,7 +287,7 @@ export default class ArchiveFilePlugin extends Plugin {
 
 /** Rebuilt on every call so the example dates follow the current month. */
 function buildTimestampDescription(): DocumentFragment {
-  const now = moment();
+  const now = currentMoment();
   return createFragment((desc) => {
     desc.appendText('Convert date tokens in {braces} using ');
     desc.createEl('a', {
