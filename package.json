@@ -1,7 +1,7 @@
 {
   "name": "archive-file",
   "version": "0.1.0",
-  "description": "Move the current file to an archive folder.",
+  "description": "Add a command to move files to an archive folder.",
   "main": "main.js",
   "license": "GPL-3.0-or-later",
   "author": "churnish",
