@@ -2,27 +2,6 @@ Add command to move file to a specified archive folder.
 
 <img src="https://github.com/user-attachments/assets/a00e1a8a-3e39-4637-8a1e-bcca88d36e9a" />
 
-## Installation
-
-Until _Archive File_ is [approved](https://github.com/obsidianmd/obsidian-releases/pull/8835), to install it:
-
-1. Download and enable the [BRAT](https://churnish.github.io/http-protocol-redirector?r=obsidian://show-plugin?id=obsidian42-brat) plugin.
-2. [Install via BRAT](https://churnish.github.io/http-protocol-redirector?r=obsidian://brat?plugin=churnish/archive-file).
-3. Select **Add plugin**.
-
-<details><summary>Install manually</summary>
-
-Note: To get updates for _Archive File_, you will have to check for and install them manually.
-
-1. Download `archive-file.zip` in the `Assets` of the [latest release](https://github.com/churnish/archive-file/releases).
-2. Open the vault folder in the system file manager.
-3. Open your Obsidian configuration folder (`.obsidian` by default, hidden on most OSes).
-4. Unzip `archive-file.zip` and place it in the `plugins` folder.
-5. Reload plugins or app.
-6. Enable _Archive File_ in Obsidian settings → Community plugins → Installed plugins.
-
-</details>
-
 ## Support
 
 - Found a bug or have a feature request? [Open an issue](https://github.com/churnish/archive-file/issues).
