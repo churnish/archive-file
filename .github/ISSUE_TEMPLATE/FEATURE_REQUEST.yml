@@ -2,7 +2,7 @@ name: Feature request
 description: Suggest an improvement or new feature for the Archive File plugin
 labels:
   - Feature request
-  - "⚪️ Pending"
+  - '⚪️ Pending'
 body:
   - type: markdown
     attributes:
@@ -18,7 +18,7 @@ body:
           required: true
   - type: markdown
     attributes:
-      value: "&#8203;"
+      value: '&#8203;'
   - type: markdown
     attributes:
       value: '## Required'
@@ -40,7 +40,7 @@ body:
       required: true
   - type: markdown
     attributes:
-      value: "&#8203;"
+      value: '&#8203;'
   - type: markdown
     attributes:
       value: '## Optional'

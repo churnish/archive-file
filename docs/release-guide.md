@@ -80,7 +80,7 @@ The tag push triggers `.github/workflows/release.yml`:
 4. **Commits anything the build changed** back to `main`, rebased onto the latest `origin/main`. Usually there is nothing to commit: build outputs are gitignored.
 5. **Generates release notes** from merged PRs and closed issues since the previous tag.
 6. **Attests build provenance** for `main.js`, `manifest.json` and, when the plugin has one, `styles.css`.
-7. **Creates a GitHub Release** with `main.js`, `manifest.json` and `styles.css` attached.
+7. **Creates a GitHub Release** with `main.js`, `manifest.json` and, when the plugin has one, `styles.css` attached.
 
 ## Updating wiki pages
 

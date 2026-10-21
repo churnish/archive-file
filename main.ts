@@ -1,18 +1,21 @@
 import {
-  AbstractInputSuggest,
   App,
   EventRef,
   Menu,
+  MenuItem,
   Notice,
   Plugin,
   PluginSettingTab,
-  setIcon,
   Setting,
-  SettingGroup,
+  SettingDefinitionItem,
   TFile,
-  TFolder,
   moment,
 } from 'obsidian';
+import {
+  buildArchiveFolderMatcher,
+  resolveArchiveFolder,
+} from './src/archive-folder-pattern';
+import { NotebookNavigatorIntegration } from './src/notebook-navigator-integration';
 
 interface ArchiveFileSettings {
   showInFileMenu: boolean;
@@ -23,6 +26,9 @@ interface ArchiveFileSettings {
   tagsToStrip: string;
   removeEmptyTags: boolean;
 }
+
+const FEEDBACK_URL = 'https://github.com/churnish/archive-file/issues';
+const DISCUSSIONS_URL = 'https://github.com/churnish/archive-file/discussions';
 
 const DEFAULT_SETTINGS: ArchiveFileSettings = {
   showInFileMenu: true,
@@ -68,34 +74,26 @@ export default class ArchiveFilePlugin extends Plugin {
       callback: () => this.archiveActiveFile(),
     });
 
-    // File context menus
-    if (this.settings.showInFileMenu) {
-      this.registerEvent(
-        this.app.workspace.on('file-menu', (menu, file) => {
-          if (!(file instanceof TFile)) return;
-          menu.addItem((item) => {
-            item
-              .setTitle('Archive file')
-              .setIcon('archive-restore')
-              .setSection('action')
-              .onClick(() => this.archiveFiles([file]));
-          });
-        })
-      );
-      this.registerEvent(
-        this.app.workspace.on('files-menu', (menu, files) => {
-          const tfiles = files.filter((f): f is TFile => f instanceof TFile);
-          if (tfiles.length === 0) return;
-          menu.addItem((item) => {
-            item
-              .setTitle(this.getMenuTitle(tfiles.length))
-              .setIcon('archive-restore')
-              .setSection('action')
-              .onClick(() => this.archiveFiles(tfiles));
-          });
-        })
-      );
-    }
+    // File context menus. Every menu handler reads its setting when the menu opens rather than registering conditionally, so toggling it applies without a reload.
+    this.registerEvent(
+      this.app.workspace.on('file-menu', (menu, file) => {
+        if (!this.settings.showInFileMenu) return;
+        if (!(file instanceof TFile)) return;
+        menu.addItem((item) =>
+          this.configureArchiveMenuItem(item, [file]).setSection('action')
+        );
+      })
+    );
+    this.registerEvent(
+      this.app.workspace.on('files-menu', (menu, files) => {
+        if (!this.settings.showInFileMenu) return;
+        const tfiles = files.filter((f): f is TFile => f instanceof TFile);
+        if (tfiles.length === 0) return;
+        menu.addItem((item) =>
+          this.configureArchiveMenuItem(item, tfiles).setSection('action')
+        );
+      })
+    );
 
     // Ribbon icon
     this.addRibbonIcon('archive-restore', 'Archive file', () =>
@@ -103,33 +101,40 @@ export default class ArchiveFilePlugin extends Plugin {
     );
 
     // Vault search results menu
-    if (this.settings.showInSearch) {
-      this.registerEvent(
-        (this.app.workspace as unknown as WorkspaceWithSearch).on(
-          'search:results-menu',
-          (menu, leaf) => {
-            const files: TFile[] = [];
-            if (leaf.dom?.vChildren?.children) {
-              for (const child of leaf.dom.vChildren.children) {
-                if (child.file instanceof TFile) {
-                  files.push(child.file);
-                }
+    this.registerEvent(
+      (this.app.workspace as unknown as WorkspaceWithSearch).on(
+        'search:results-menu',
+        (menu, leaf) => {
+          if (!this.settings.showInSearch) return;
+          const files: TFile[] = [];
+          if (leaf.dom?.vChildren?.children) {
+            for (const child of leaf.dom.vChildren.children) {
+              if (child.file instanceof TFile) {
+                files.push(child.file);
               }
             }
-            if (files.length === 0) return;
-            menu.addItem((item) => {
-              item
-                .setTitle(this.getMenuTitle(files.length))
-                .setIcon('archive-restore')
-                .setSection('action')
-                .onClick(() => this.archiveFiles(files));
-            });
           }
-        )
-      );
-    }
+          if (files.length === 0) return;
+          menu.addItem((item) =>
+            this.configureArchiveMenuItem(item, files).setSection('action')
+          );
+        }
+      )
+    );
+
+    this.app.workspace.onLayoutReady(() => {
+      new NotebookNavigatorIntegration(this).register();
+    });
 
     this.addSettingTab(new ArchiveFileSettingTab(this.app, this));
+  }
+
+  /** Shared by every file menu that offers archiving. Leaves the section to the caller, since Notebook Navigator's menu does not group items by section. */
+  configureArchiveMenuItem(item: MenuItem, files: TFile[]): MenuItem {
+    return item
+      .setTitle(this.getMenuTitle(files.length))
+      .setIcon('archive-restore')
+      .onClick(() => this.archiveFiles(files));
   }
 
   private archiveActiveFile(): void {
@@ -142,7 +147,7 @@ export default class ArchiveFilePlugin extends Plugin {
   }
 
   private getMenuTitle(count: number): string {
-    return count === 1 ? 'Archive file' : `Archive ${count} files`;
+    return count === 1 ? 'Archive file' : `Archive ${count} items`;
   }
 
   private async archiveFiles(files: TFile[]): Promise<void> {
@@ -154,13 +159,15 @@ export default class ArchiveFilePlugin extends Plugin {
     }
 
     // Pre-compute shared values once
-    const now = moment();
-    let archiveFolder = this.settings.useTimestamps
-      ? this.settings.archiveFolder.replace(/\{([^}]+)\}/g, (_, fmt: string) =>
-          now.format(fmt)
-        )
-      : this.settings.archiveFolder;
-    archiveFolder = archiveFolder.replace(/^\/+|\/+$/g, '');
+    const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '');
+    const folderTemplate = trimSlashes(this.settings.archiveFolder);
+    const archiveFolder = this.settings.useTimestamps
+      ? trimSlashes(resolveArchiveFolder(folderTemplate, moment()))
+      : folderTemplate;
+    // With timestamps, a folder the template resolved to on an earlier date is already the file's archive, so it stays there
+    const isArchiveFolder = this.settings.useTimestamps
+      ? buildArchiveFolderMatcher(folderTemplate)
+      : (folderPath: string) => folderPath === archiveFolder;
 
     const tagsToStrip = this.settings.tagsToStrip
       ? this.settings.tagsToStrip
@@ -172,17 +179,23 @@ export default class ArchiveFilePlugin extends Plugin {
     let movedCount = 0;
     let failedCount = 0;
     for (const file of files) {
-      const result = await this.archiveFile(file, archiveFolder, tagsToStrip);
+      const result = await this.archiveFile(
+        file,
+        archiveFolder,
+        isArchiveFolder,
+        tagsToStrip
+      );
       if (result === 'moved') movedCount++;
       else if (result === 'failed') failedCount++;
     }
 
     if (this.settings.showNotification) {
-      if (files.length === 1 && failedCount === 0) {
-        new Notice('File archived');
+      if (files.length === 1) {
+        if (movedCount === 1) new Notice('File archived');
+        else if (failedCount === 0) new Notice('File already archived');
       } else if (movedCount > 0) {
         new Notice(
-          movedCount === 1 ? '1 file archived' : `${movedCount} files archived`
+          movedCount === 1 ? '1 item archived' : `${movedCount} items archived`
         );
       }
     }
@@ -191,10 +204,13 @@ export default class ArchiveFilePlugin extends Plugin {
   private async archiveFile(
     file: TFile,
     archiveFolder: string,
+    isArchiveFolder: (folderPath: string) => boolean,
     tagsToStrip: string[]
   ): Promise<'moved' | 'skipped' | 'failed'> {
-    const currentFolder = file.parent?.path ?? '';
-    const needsMove = currentFolder !== archiveFolder;
+    // The vault root's path is `/`, but an archive folder of `/` is trimmed to `''`
+    const currentFolder =
+      !file.parent || file.parent.isRoot() ? '' : file.parent.path;
+    const needsMove = !isArchiveFolder(currentFolder);
 
     try {
       if (needsMove) {
@@ -267,12 +283,35 @@ export default class ArchiveFilePlugin extends Plugin {
       (await this.loadData()) as Partial<ArchiveFileSettings>
     );
   }
-
-  async saveSettings() {
-    await this.saveData(this.settings);
-  }
 }
 
+/** Rebuilt on every call so the example dates follow the current month. */
+function buildTimestampDescription(): DocumentFragment {
+  const now = moment();
+  return createFragment((desc) => {
+    desc.appendText('Convert date tokens in {braces} using ');
+    desc.createEl('a', {
+      text: 'Moment',
+      href: 'https://momentjs.com/docs/#/displaying/format/',
+    });
+    desc.appendText(
+      ` format. E.g., {YYYY} → ${now.format('YYYY')}, {MM} → ${now.format('MM')}.`
+    );
+  });
+}
+
+/** `render` rather than `action`, so the button keeps its label instead of turning the whole row into a click target. */
+function buildLinkButtonRow(url: string): (setting: Setting) => void {
+  return (setting) => {
+    setting.addButton((button) =>
+      button.setButtonText('Open').onClick(() => {
+        setting.settingEl.win.open(url, '_blank');
+      })
+    );
+  };
+}
+
+// The inherited getControlValue/setControlValue read and save `plugin.settings` by key, which fits these flat settings without overrides
 class ArchiveFileSettingTab extends PluginSettingTab {
   plugin: ArchiveFilePlugin;
 
@@ -282,193 +321,70 @@ class ArchiveFileSettingTab extends PluginSettingTab {
     this.icon = 'archive-restore';
   }
 
-  display(): void {
-    const { containerEl } = this;
-    containerEl.empty();
-    containerEl.addClass('archive-file-settings');
-
-    // Pre-create wrapper div for tags sub-setting (needed for onChange callback)
-    const tagsSubSettings = containerEl.createDiv('setting-sub-items');
-    if (!this.plugin.settings.tagsToStrip) {
-      tagsSubSettings.addClass('archive-file-hidden');
-    }
-
-    // Capture settings for post-processing
-    let timestampSetting: Setting | undefined;
-    let tagsSubSetting: Setting | undefined;
-
-    new SettingGroup(containerEl)
-      .addSetting((s) => {
-        s.setName('Archive folder')
-          .setDesc('Destination folder for archived files')
-          .addText((text) => {
-            text
-              .setPlaceholder('Archive')
-              .setValue(this.plugin.settings.archiveFolder)
-              .onChange(async (value) => {
-                this.plugin.settings.archiveFolder = value;
-                await this.plugin.saveSettings();
-              });
-            new FolderSuggest(this.app, text.inputEl);
-          });
-      })
-      .addSetting((s) => {
-        timestampSetting = s;
-        s.setName('Resolve timestamps in folder path').addToggle((toggle) =>
-          toggle
-            .setValue(this.plugin.settings.useTimestamps)
-            .onChange(async (value) => {
-              this.plugin.settings.useTimestamps = value;
-              await this.plugin.saveSettings();
-            })
-        );
-      })
-      .addSetting((s) => {
-        s.setName('Tags to strip')
-          .setDesc(
-            'Comma-separated list of tags to remove from properties when archiving'
-          )
-          .addText((text) =>
-            text
-              .setPlaceholder('Inbox, todo')
-              .setValue(this.plugin.settings.tagsToStrip)
-              .onChange(async (value) => {
-                this.plugin.settings.tagsToStrip = value;
-                await this.plugin.saveSettings();
-                tagsSubSettings.toggleClass('archive-file-hidden', !value);
-              })
-          );
-      })
-      .addSetting((s) => {
-        tagsSubSetting = s;
-        s.setName('Remove empty tags property')
-          .setDesc(
-            'Delete the tags property from properties if all tags are stripped'
-          )
-          .addToggle((toggle) =>
-            toggle
-              .setValue(this.plugin.settings.removeEmptyTags)
-              .onChange(async (value) => {
-                this.plugin.settings.removeEmptyTags = value;
-                await this.plugin.saveSettings();
-              })
-          );
-      })
-      .addSetting((s) => {
-        s.setName('File context menu')
-          .setDesc(
-            'Show archive option when right-clicking files (reload required)'
-          )
-          .addToggle((toggle) =>
-            toggle
-              .setValue(this.plugin.settings.showInFileMenu)
-              .onChange(async (value) => {
-                this.plugin.settings.showInFileMenu = value;
-                await this.plugin.saveSettings();
-              })
-          );
-      })
-      .addSetting((s) => {
-        s.setName('Vault search menu')
-          .setDesc(
-            'Show archive option in vault search results context menu (reload required)'
-          )
-          .addToggle((toggle) =>
-            toggle
-              .setValue(this.plugin.settings.showInSearch)
-              .onChange(async (value) => {
-                this.plugin.settings.showInSearch = value;
-                await this.plugin.saveSettings();
-              })
-          );
-      })
-      .addSetting((s) => {
-        s.setName('Show notification')
-          .setDesc('Show a notice after archiving files')
-          .addToggle((toggle) =>
-            toggle
-              .setValue(this.plugin.settings.showNotification)
-              .onChange(async (value) => {
-                this.plugin.settings.showNotification = value;
-                await this.plugin.saveSettings();
-              })
-          );
-      });
-
-    // Add description to timestamp setting (after SettingGroup executes callbacks)
-    if (timestampSetting) {
-      const now = moment();
-      const desc = timestampSetting.descEl;
-      desc.appendText('Convert date tokens in {braces} using ');
-      desc.createEl('a', {
-        text: 'Moment.js',
-        href: 'https://momentjs.com/docs/#/displaying/format/',
-      });
-      desc.appendText(
-        ` format. E.g., {YYYY} → ${now.format('YYYY')}, {MM} → ${now.format('MM')}.`
-      );
-    }
-
-    // Move tags sub-setting into wrapper
-    if (tagsSubSetting) {
-      tagsSubSetting.settingEl.before(tagsSubSettings);
-      tagsSubSettings.appendChild(tagsSubSetting.settingEl);
-    }
-
-    // Feedback button
-    const feedbackContainer = containerEl.createDiv({
-      cls: 'archive-file-feedback-container',
-    });
-
-    const button = feedbackContainer.createEl('button', {
-      cls: 'mod-cta archive-file-feedback-button',
-    });
-    button.addEventListener('click', () => {
-      window.open(
-        'https://github.com/greetclammy/archive-file/issues',
-        '_blank'
-      );
-    });
-
-    const iconDiv = button.createDiv();
-    setIcon(iconDiv, 'message-square-reply');
-
-    button.appendText('Leave feedback');
-  }
-}
-
-class FolderSuggest extends AbstractInputSuggest<TFolder> {
-  private inputEl: HTMLInputElement;
-
-  constructor(app: App, inputEl: HTMLInputElement) {
-    super(app, inputEl);
-    this.inputEl = inputEl;
-  }
-
-  getSuggestions(query: string): TFolder[] {
-    const folders = this.app.vault
-      .getAllLoadedFiles()
-      .filter(
-        (file): file is TFolder => file instanceof TFolder && file.path !== ''
-      );
-
-    if (!query) {
-      return folders.slice(0, 10);
-    }
-
-    const lowerQuery = query.toLowerCase();
-    return folders
-      .filter((folder) => folder.path.toLowerCase().includes(lowerQuery))
-      .slice(0, 10);
-  }
-
-  renderSuggestion(folder: TFolder, el: HTMLElement): void {
-    el.setText(folder.path);
-  }
-
-  selectSuggestion(folder: TFolder): void {
-    this.inputEl.value = folder.path;
-    this.inputEl.trigger('input');
-    this.close();
+  getSettingDefinitions(): SettingDefinitionItem<keyof ArchiveFileSettings>[] {
+    return [
+      {
+        name: 'Archive folder',
+        desc: 'Destination folder for archived files.',
+        // Free text with folder suggestions, so date tokens in braces are kept as typed
+        control: {
+          type: 'folder',
+          key: 'archiveFolder',
+          placeholder: 'Archive',
+        },
+      },
+      {
+        name: 'Resolve timestamps in folder path',
+        desc: buildTimestampDescription(),
+        control: { type: 'toggle', key: 'useTimestamps' },
+      },
+      {
+        name: 'Tags to strip',
+        desc: 'Comma-separated list of tags to remove from properties when archiving.',
+        control: {
+          type: 'text',
+          key: 'tagsToStrip',
+          placeholder: 'Inbox, todo',
+        },
+      },
+      {
+        name: 'Remove empty tags property',
+        desc: 'Delete the tags property from properties if all tags are stripped.',
+        visible: () => !!this.plugin.settings.tagsToStrip,
+        control: { type: 'toggle', key: 'removeEmptyTags' },
+      },
+      {
+        name: 'File context menu',
+        desc: 'Show archive option when right-clicking files.',
+        control: { type: 'toggle', key: 'showInFileMenu' },
+      },
+      {
+        name: 'Vault search menu',
+        desc: 'Show archive option in vault search results context menu.',
+        control: { type: 'toggle', key: 'showInSearch' },
+      },
+      {
+        name: 'Show notification',
+        desc: 'Show a notice after archiving files.',
+        control: { type: 'toggle', key: 'showNotification' },
+      },
+      // Support addresses the plugin itself rather than any setting, so it gets its own box at the very bottom. Discuss leads because it is the self-serve option — a user who finds an existing answer never needs the row below it.
+      {
+        type: 'group',
+        heading: 'Support',
+        items: [
+          {
+            name: 'Discuss',
+            desc: 'Browse discussions or ask a question.',
+            render: buildLinkButtonRow(DISCUSSIONS_URL),
+          },
+          {
+            name: 'Send feedback',
+            desc: 'Request improvements or report bugs.',
+            render: buildLinkButtonRow(FEEDBACK_URL),
+          },
+        ],
+      },
+    ];
   }
 }
