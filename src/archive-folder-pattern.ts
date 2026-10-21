@@ -1,4 +1,4 @@
-import { moment } from 'obsidian';
+import { moment, normalizePath } from 'obsidian';
 
 /** The part of a Moment date this plugin uses. */
 export interface MomentDate {
@@ -16,6 +16,12 @@ const createMoment = moment as unknown as (
 /** The current date and time. */
 export function currentMoment(): MomentDate {
   return createMoment();
+}
+
+/** Normalizes a typed archive folder the way the vault stores paths (merged slashes, NFC Unicode), so it compares equal to `TFolder.path`. `normalizePath` turns the vault root into `/`; the archive code writes the root as `''`. */
+export function toArchiveFolderPath(path: string): string {
+  const normalized = normalizePath(path);
+  return normalized === '/' ? '' : normalized;
 }
 
 // Splitting on this keeps the captured formats, so even indices are literal text and odd indices are Moment formats

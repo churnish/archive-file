@@ -14,6 +14,7 @@ import {
   buildArchiveFolderMatcher,
   currentMoment,
   resolveArchiveFolder,
+  toArchiveFolderPath,
 } from './src/archive-folder-pattern';
 import { NotebookNavigatorIntegration } from './src/notebook-navigator-integration';
 
@@ -159,10 +160,11 @@ export default class ArchiveFilePlugin extends Plugin {
     }
 
     // Pre-compute shared values once
-    const trimSlashes = (path: string) => path.replace(/^\/+|\/+$/g, '');
-    const folderTemplate = trimSlashes(this.settings.archiveFolder);
+    const folderTemplate = toArchiveFolderPath(this.settings.archiveFolder);
     const archiveFolder = this.settings.useTimestamps
-      ? trimSlashes(resolveArchiveFolder(folderTemplate, currentMoment()))
+      ? toArchiveFolderPath(
+          resolveArchiveFolder(folderTemplate, currentMoment())
+        )
       : folderTemplate;
     // With timestamps, a folder the template resolved to on an earlier date is already the file's archive, so it stays there
     const isArchiveFolder = this.settings.useTimestamps
@@ -195,7 +197,7 @@ export default class ArchiveFilePlugin extends Plugin {
         else if (failedCount === 0) new Notice('File already archived');
       } else if (movedCount > 0) {
         new Notice(
-          movedCount === 1 ? '1 item archived' : `${movedCount} items archived`
+          movedCount === 1 ? '1 file archived' : `${movedCount} files archived`
         );
       }
     }
@@ -207,7 +209,7 @@ export default class ArchiveFilePlugin extends Plugin {
     isArchiveFolder: (folderPath: string) => boolean,
     tagsToStrip: string[]
   ): Promise<'moved' | 'skipped' | 'failed'> {
-    // The vault root's path is `/`, but an archive folder of `/` is trimmed to `''`
+    // The vault root's path is `/`, but `toArchiveFolderPath` writes the root as `''`
     const currentFolder =
       !file.parent || file.parent.isRoot() ? '' : file.parent.path;
     const needsMove = !isArchiveFolder(currentFolder);
@@ -344,7 +346,7 @@ class ArchiveFileSettingTab extends PluginSettingTab {
         control: {
           type: 'text',
           key: 'tagsToStrip',
-          placeholder: 'Inbox, todo',
+          placeholder: 'inbox, todo',
         },
       },
       {
@@ -354,13 +356,13 @@ class ArchiveFileSettingTab extends PluginSettingTab {
         control: { type: 'toggle', key: 'removeEmptyTags' },
       },
       {
-        name: 'File context menu',
-        desc: 'Show archive option when right-clicking files.',
+        name: 'Show file command',
+        desc: 'Show the archive command in the file context menu.',
         control: { type: 'toggle', key: 'showInFileMenu' },
       },
       {
-        name: 'Vault search menu',
-        desc: 'Show archive option in vault search results context menu.',
+        name: 'Show search command',
+        desc: 'Show the archive command in the vault search context menu.',
         control: { type: 'toggle', key: 'showInSearch' },
       },
       {
