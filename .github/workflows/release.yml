@@ -1,3 +1,4 @@
+# Synced from plugins/local/shared/release-ts.yml. Edit the source, then run plugins/local/sync-shared.mjs; do not edit this copy.
 name: Release
 
 on:

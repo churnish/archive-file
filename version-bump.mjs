@@ -1,4 +1,4 @@
-// This file is byte-identical across every plugin in the workspace and must stay generic: capability gates are feature-detected rather than hardcoded, so the same bytes work in the JS-only plugins.
+// This file is byte-identical across every plugin in the workspace and must stay generic: capability gates are feature-detected rather than hardcoded, so the same bytes work in the JS-only plugins. Its source is plugins/local/shared/version-bump.mjs, synced by plugins/local/sync-shared.mjs; edit the source, not a copy.
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { execSync, execFileSync } from 'child_process';
 import { basename, dirname, join } from 'path';
@@ -21,6 +21,8 @@ const commandSucceeds = (command) => {
 
 const isPreflight = process.argv.includes('--preflight');
 const targetVersion = process.env.npm_package_version;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pluginName = basename(__dirname);
 
 // GitHub is the source of truth for these: they are edited through the web UI, so their content is taken from origin whole rather than reconciled hunk by hunk. Local edits to them are expected to be overwritten — edit them in the web editor, not here.
 const WEB_EDITED_DOCS = ['README', 'CONTRIBUTING'];
@@ -217,6 +219,20 @@ function runPreflight() {
     process.exit(1);
   }
 
+  // The source exists only on the maintainer's machine, so CI and clones skip this check. It runs first so a stale copy stops the release before anything is merged or installed.
+  const syncScript = join(__dirname, '..', 'local', 'sync-shared.mjs');
+  if (existsSync(syncScript)) {
+    try {
+      execFileSync(process.execPath, [syncScript, '--check', pluginName], {
+        stdio: 'inherit',
+      });
+    } catch (err) {
+      // A failed check has already printed its remedy. Only a spawn failure has printed nothing, and it carries a null status, not undefined: Node copies spawnSync's result onto the error.
+      if (typeof err.status !== 'number') console.error(`\n⚠ ${err.message}\n`);
+      process.exit(1);
+    }
+  }
+
   // Merge before the gates so they run against exactly what gets tagged. This is the only point in the lifecycle with a clean tree — once the `version` script runs, npm has already rewritten package.json and git merge refuses to overwrite it.
   mergeOriginMain();
 
@@ -271,25 +287,6 @@ function runVersionPhase() {
     process.exit(1);
   }
 
-  // ── Sync shared docs ──
-
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  // Source of truth for docs copied verbatim into every plugin. Not the odkb repo: these describe this workspace's own release machinery, not shared Obsidian knowledge.
-  const sharedDocsDir = join(__dirname, '..', 'local');
-
-  const sharedDocs = ['release-guide.md'];
-  for (const doc of sharedDocs) {
-    const src = join(sharedDocsDir, doc);
-    if (existsSync(src)) {
-      const dest = join('docs', doc);
-      writeFileSync(dest, readFileSync(src, 'utf8'));
-      gitAdd(dest);
-      console.log(`Synced ${doc} from local/`);
-    } else {
-      console.warn(`Skipping ${doc}: not found at ${src}`);
-    }
-  }
-
   // npm hoists most packages to the workspace root and nests only what cannot hoist, so look upward rather than assuming either location.
   function installedVersion(packageName) {
     let dir = process.cwd();
@@ -333,7 +330,6 @@ function runVersionPhase() {
 
   console.log(`Updated manifest.json to version ${targetVersion}`);
 
-  const pluginName = basename(__dirname);
   const deepwikiPlugins = ['dynamic-views', 'first-line-is-title'];
   if (deepwikiPlugins.includes(pluginName)) {
     console.log(
