@@ -6,4 +6,4 @@ Add command to move file to a specified archive folder.
 
 - Found a bug or have a feature request? [Open an issue](https://github.com/churnish/archive-file/issues).
 - Have a question? [Start a discussion](https://github.com/churnish/archive-file/discussions).
-- PRs welcome.
+- Contributors welcome.
